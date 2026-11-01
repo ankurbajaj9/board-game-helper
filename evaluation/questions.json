@@ -1,0 +1,144 @@
+{
+  "cases": [
+    {
+      "case_id": "catan_objective",
+      "document_id": "catan-2025-en",
+      "question": "How many victory points does a player need to win?",
+      "reference_answer": "The first player to reach 10 victory points on their turn wins.",
+      "evidence_pages": [2]
+    },
+    {
+      "case_id": "catan_starting_resources",
+      "document_id": "catan-2025-en",
+      "question": "How does each player get their starting resource cards?",
+      "reference_answer": "Each player takes the resource cards matching the hexes adjacent to their second settlement.",
+      "evidence_pages": [5]
+    },
+    {
+      "case_id": "catan_first_player",
+      "document_id": "catan-2025-en",
+      "question": "How is the first player chosen?",
+      "reference_answer": "Each player rolls the dice, and the player with the highest roll goes first.",
+      "evidence_pages": [5]
+    },
+    {
+      "case_id": "catan_road_building",
+      "document_id": "catan-2025-en",
+      "question": "What does the Road Building development card let its player do?",
+      "reference_answer": "Build two roads at no cost.",
+      "evidence_pages": [3]
+    },
+    {
+      "case_id": "catan_city_points",
+      "document_id": "catan-2025-en",
+      "question": "How many victory points is a city worth?",
+      "reference_answer": "A city is worth two victory points.",
+      "evidence_pages": [9]
+    },
+    {
+      "case_id": "love_letter_starting_hand",
+      "document_id": "love-letter-en",
+      "question": "How many cards does each player receive as their starting hand?",
+      "reference_answer": "Each player receives one card.",
+      "evidence_pages": [3]
+    },
+    {
+      "case_id": "love_letter_turn",
+      "document_id": "love-letter-en",
+      "question": "What does a player do with cards on their turn?",
+      "reference_answer": "They draw one card, then choose and play one of their two cards.",
+      "evidence_pages": [4]
+    },
+    {
+      "case_id": "love_letter_round_end",
+      "document_id": "love-letter-en",
+      "question": "What can cause a round to end?",
+      "reference_answer": "The deck runs out, or only one player remains in the round.",
+      "evidence_pages": [6]
+    },
+    {
+      "case_id": "love_letter_round_winner",
+      "document_id": "love-letter-en",
+      "question": "How can a player win a round?",
+      "reference_answer": "Be the only player left, or have the highest-value card when the round ends.",
+      "evidence_pages": [4, 6]
+    },
+    {
+      "case_id": "love_letter_four_player_tokens",
+      "document_id": "love-letter-en",
+      "question": "How many favor tokens are needed to win with four players?",
+      "reference_answer": "A player needs four favor tokens.",
+      "evidence_pages": [7]
+    },
+    {
+      "case_id": "pandemic_win",
+      "document_id": "pandemic-en",
+      "question": "What must the players do to win?",
+      "reference_answer": "Discover cures for all four diseases.",
+      "evidence_pages": [1]
+    },
+    {
+      "case_id": "pandemic_outbreak_loss",
+      "document_id": "pandemic-en",
+      "question": "How many outbreaks cause the players to lose?",
+      "reference_answer": "The players lose when eight outbreaks occur.",
+      "evidence_pages": [1]
+    },
+    {
+      "case_id": "pandemic_actions",
+      "document_id": "pandemic-en",
+      "question": "How many actions does a player take on their turn?",
+      "reference_answer": "A player takes four actions.",
+      "evidence_pages": [2]
+    },
+    {
+      "case_id": "pandemic_outbreak_effect",
+      "document_id": "pandemic-en",
+      "question": "When a disease outbreak occurs, what happens to connected cities?",
+      "reference_answer": "Place one cube of the outbreak's disease color in every connected city.",
+      "evidence_pages": [7]
+    },
+    {
+      "case_id": "pandemic_player_card_draw",
+      "document_id": "pandemic-en",
+      "question": "How many player cards are drawn during the draw step of a turn?",
+      "reference_answer": "Draw two player cards.",
+      "evidence_pages": [2]
+    },
+    {
+      "case_id": "azul_factory_pick",
+      "document_id": "azul-en",
+      "question": "When taking tiles from a factory, which tiles must a player take?",
+      "reference_answer": "All tiles of one chosen color from that factory.",
+      "evidence_pages": [3]
+    },
+    {
+      "case_id": "azul_factory_remainder",
+      "document_id": "azul-en",
+      "question": "Where do the tiles left in a factory go after a player takes a color?",
+      "reference_answer": "The remaining tiles from that factory move to the center of the table.",
+      "evidence_pages": [3]
+    },
+    {
+      "case_id": "azul_floor_line",
+      "document_id": "azul-en",
+      "question": "What happens to tiles placed in a player's floor line?",
+      "reference_answer": "They count as fallen tiles and give minus points during the wall-tiling phase.",
+      "evidence_pages": [4]
+    },
+    {
+      "case_id": "azul_game_end",
+      "document_id": "azul-en",
+      "question": "What triggers the end of the game?",
+      "reference_answer": "The game ends after a round in which a player completes a horizontal line of five tiles on their wall.",
+      "evidence_pages": [3, 6]
+    },
+    {
+      "case_id": "azul_complete_row_points",
+      "document_id": "azul-en",
+      "question": "How many bonus points does each complete horizontal line score at the end of the game?",
+      "reference_answer": "Each complete horizontal line of five tiles scores two bonus points.",
+      "evidence_pages": [6]
+    }
+  ]
+}

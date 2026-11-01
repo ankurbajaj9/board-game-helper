@@ -1,0 +1,10 @@
+# Publisher rulebooks and generated data stay local.
+data/
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
