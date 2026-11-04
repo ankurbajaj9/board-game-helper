@@ -6,7 +6,7 @@ from streamlit.elements.lib.mutable_status_container import StatusContainer
 from streamlit.testing.v1 import AppTest
 
 from board_game_rules import bootstrap
-from board_game_rules.domain.models import Answer, Chunk, Evidence, ParseReport
+from board_game_rules.domain.models import Answer, Catalog, Chunk, Evidence, ParseReport, Rulebook
 from board_game_rules.infrastructure.catalog import load_catalog
 from board_game_rules.interfaces import ui
 
@@ -79,6 +79,24 @@ def test_blank_question_does_not_call_models(ask: Mock) -> None:
     app = AppTest.from_function(run_ui).run()
     app.button[0].click().run()
     assert app.error[0].value == "Please enter a question."
+    ask.assert_not_called()
+
+
+def test_local_rulebook_has_no_generic_disclaimer(
+    ask: Mock, rulebook: Rulebook, monkeypatch
+) -> None:
+    local_rulebook = rulebook.model_copy(update={"download_url": None, "source_page": None})
+    catalog = Catalog(schema_version=1, documents=(local_rulebook,))
+    monkeypatch.setattr(bootstrap, "catalog", lambda settings: catalog)
+
+    app = AppTest.from_function(run_ui).run()
+
+    assert not app.exception
+    assert app.multiselect[0].value == [local_rulebook.document_id]
+    assert not app.warning
+    assert not any(
+        "Searches only the selected manuals" in caption.value for caption in app.caption
+    )
     ask.assert_not_called()
 
 

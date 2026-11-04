@@ -93,12 +93,6 @@ def main() -> None:
         st.success(message)
     for doc in selected_docs:
         st.caption(f"{doc.title} · Edition: {doc.edition}")
-    st.info(
-        "Searches only the selected manuals' persistent Qdrant indexes. New PDFs are indexed "
-        "by the local Prefect folder pipeline."
-    )
-    if any(doc.download_url is None for doc in selected_docs):
-        st.warning("Local upload: title, edition, publisher, and English language are unverified.")
     for doc in selected_docs:
         if doc.kind == "expansion" and not set(doc.compatible_base_document_ids).intersection(
             document_ids

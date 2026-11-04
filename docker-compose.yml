@@ -1,5 +1,44 @@
 name: board-game-rules
 services:
+  prefect:
+    image: prefecthq/prefect:3.9.1-python3.14
+    command: prefect server start --host 0.0.0.0 --port 4201
+    ports:
+      - "127.0.0.1:4201:4201"
+    environment:
+      PREFECT_HOME: /prefect
+      PREFECT_SERVER_DATABASE_CONNECTION_URL: sqlite+aiosqlite:////prefect/prefect.db
+      PREFECT_SERVER_UI_API_URL: http://127.0.0.1:4201/api
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
+    volumes:
+      - ./data/prefect:/prefect
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4201/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  watcher:
+    build: .
+    init: true
+    environment:
+      BGR_PROJECT_ROOT: /app
+      BGR_PREFECT_URL: http://prefect:4201/api
+      BGR_QDRANT_URL: http://qdrant:6333
+      BGR_OLLAMA_URL: http://host.docker.internal:11434
+    volumes:
+      - ./data:/app/data
+      - ./catalog:/app/catalog:ro
+      - models:/models
+    depends_on:
+      prefect:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
   qdrant:
     image: qdrant/qdrant:v1.20.0
     ports:
@@ -23,3 +62,6 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+
+volumes:
+  models:

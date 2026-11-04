@@ -40,7 +40,7 @@ class Vectors:
             ]
             self.client.upsert(collection, points, wait=True)
         if self.client.count(collection, exact=True).count != len(chunks):
-            raise ValueError("Qdrant stored chunk count does not match the smoke-test batch.")
+            raise ValueError("Qdrant stored chunk count does not match the inserted batch.")
 
     def search(
         self, collection: str, document_id: str, vector: list[float], limit: int

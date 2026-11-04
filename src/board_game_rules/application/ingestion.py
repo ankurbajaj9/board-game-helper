@@ -1,10 +1,15 @@
 from typing import Protocol
 
-from board_game_rules.application.smoke import Embedder
 from board_game_rules.config import Settings
 from board_game_rules.domain.models import Chunk, ParseReport, Rulebook
 from board_game_rules.infrastructure.catalog import verify_pdf
 from board_game_rules.infrastructure.state import IndexState
+
+
+class Embedder(Protocol):
+    dimension: int
+
+    def passages(self, texts: list[str]) -> list[list[float]]: ...
 
 
 class DocumentParser(Protocol):

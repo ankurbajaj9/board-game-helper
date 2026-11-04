@@ -10,19 +10,18 @@ from pydantic import ValidationError
 from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 
 from board_game_rules import bootstrap
-from board_game_rules.application.evaluation import (
+from board_game_rules.config import Settings
+from board_game_rules.evaluation import (
     EvaluationReport,
     load_dataset,
     run_evaluation,
     summarize_faithfulness,
 )
-from board_game_rules.application.smoke import smoke_test
-from board_game_rules.config import Settings
 from board_game_rules.infrastructure.state import IndexState
 
 
 def argument_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Local board game rules RAG compatibility tools")
+    parser = argparse.ArgumentParser(description="Local board game rules RAG tools")
     parser.add_argument("--root", help="Project directory containing catalog/ and data/")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="List catalog document IDs and editions")
@@ -30,11 +29,6 @@ def argument_parser() -> argparse.ArgumentParser:
     commands.add_parser("doctor", help="Check Python/package versions, Qdrant, and Gemma 4")
     parse = commands.add_parser("parse", help="Parse/chunk one PDF and cache local diagnostics")
     parse.add_argument("document_id")
-    smoke = commands.add_parser(
-        "smoke", help="Run PDF -> vectors -> cited Gemma answer; remove test vectors"
-    )
-    smoke.add_argument("document_id")
-    smoke.add_argument("question")
     evaluate = commands.add_parser(
         "evaluate", help="Compare plain and few-shot prompts on the fixed question set"
     )
@@ -129,24 +123,6 @@ def run(args: argparse.Namespace, settings: Settings) -> None:
         parsing = bootstrap.parsing(settings)
         chunks, report = parsing.parser.parse(doc)
         print(report.model_dump_json(indent=2))
-        if args.command == "smoke":
-            vectors, ollama = bootstrap.local_services(settings)
-            try:
-                ollama.check_model()
-                answer, evidence = smoke_test(
-                    doc, chunks, args.question, parsing.embeddings, vectors, ollama, settings
-                )
-                print(answer.model_dump_json(indent=2))
-                for entry in evidence:
-                    if entry.citation_id in answer.citations:
-                        print(
-                            f"[{entry.citation_id}] {doc.title}, PDF pages {entry.chunk.pdf_pages}"
-                        )
-                if not answer.supported:
-                    raise ValueError("Smoke test did not produce a supported answer.")
-                print("Smoke test passed; temporary Qdrant collection removed.")
-            finally:
-                vectors.close()
 
 
 def main() -> None:

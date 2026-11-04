@@ -1,13 +1,6 @@
 from pathlib import Path
 from unittest.mock import Mock
 
-from board_game_rules.application.evaluation import (
-    EvaluationCase,
-    EvaluationReport,
-    load_dataset,
-    run_evaluation,
-    summarize_faithfulness,
-)
 from board_game_rules.config import Settings
 from board_game_rules.domain.models import (
     Answer,
@@ -16,6 +9,13 @@ from board_game_rules.domain.models import (
     Evidence,
     ParseReport,
     Rulebook,
+)
+from board_game_rules.evaluation import (
+    EvaluationCase,
+    EvaluationReport,
+    load_dataset,
+    run_evaluation,
+    summarize_faithfulness,
 )
 
 

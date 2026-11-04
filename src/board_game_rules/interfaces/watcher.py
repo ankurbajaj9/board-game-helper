@@ -18,8 +18,6 @@ def main() -> None:
     from urllib.parse import urlsplit
 
     target = urlsplit(str(settings.prefect_url))
-    if target.hostname not in ("localhost", "127.0.0.1") or not target.port:
-        parser.error("Local Prefect requires a localhost URL with an explicit port.")
     # Isolate this process from other projects' Prefect profiles, server, and database.
     os.environ["PREFECT_HOME"] = str(settings.project_root / "data" / "prefect")
     os.environ["PREFECT_API_URL"] = str(settings.prefect_url).rstrip("/")
@@ -33,6 +31,8 @@ def main() -> None:
     if args.command == "server":
         import sys
 
+        if target.hostname not in ("localhost", "127.0.0.1") or not target.port:
+            parser.error("Local Prefect server requires a localhost URL with an explicit port.")
         os.execv(
             sys.executable,
             [

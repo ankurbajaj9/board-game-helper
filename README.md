@@ -8,8 +8,7 @@ and edition.
 
 - Validated PDF inputs and source/edition metadata.
 - Optional source registry in [catalog/rulebooks.json](catalog/rulebooks.json).
-- CLI commands to validate PDFs, parse/chunk them, and run a local
-  Qdrant-to-Gemma smoke test with validated PDF-page citations.
+- CLI commands to validate PDFs, parse/chunk them, and evaluate RAG answers.
 - A fixed question set and CLI evaluation comparing plain and few-shot cited
   answers using the same retrieved evidence.
 - Architecture, phased todo list, and acceptance tests in
@@ -22,20 +21,20 @@ expansion-precedence resolution remain pending.
 
 ## Automatic PDF ingestion with local Prefect
 
-Start Qdrant, then run these commands in two terminals from this directory:
+Start Qdrant, the Prefect server, and the PDF watcher together:
 
 ```bash
-docker compose up -d
-uv run board-game-rules-watch server
-```
-
-```bash
-uv run board-game-rules-watch watch
+docker compose up -d --build
 ```
 
 Prefect UI: **http://127.0.0.1:4201**. The dedicated API, profiles, and SQLite
 database stay under `data/prefect/`; this does not use the other project's
 Prefect instance on port 4200 or Prefect Cloud.
+Only localhost port 4201 is published; the watcher connects to Prefect and
+Qdrant through the private Compose network. Ollama and the Streamlit UI stay
+native on the Mac; Ollama retains Apple Silicon GPU acceleration.
+The first watcher build installs the locked Python dependencies. Model downloads
+on first ingestion are persisted in the Compose `models` volume.
 
 Drop an English `.pdf` into **`data/rulebooks/`** (subfolders and uppercase
 `.PDF` extensions are supported). The watcher polls every 30 seconds and waits
@@ -63,8 +62,9 @@ modified and no publisher URL is fabricated.
 Manual operations (the local server must be running for `scan`):
 
 ```bash
-uv run board-game-rules-watch scan     # index all settled PDFs once
-uv run board-game-rules-watch status   # ready/failed status and errors
+docker compose exec watcher board-game-rules-watch scan
+docker compose exec watcher board-game-rules-watch status
+docker compose logs -f watcher prefect
 ```
 
 Failed replacements do not replace the last good index. The UI retrieves only
@@ -73,12 +73,16 @@ generations are retained for safety; automatic garbage collection and deletion
 on source-file removal are intentionally not implemented. Back up originals,
 `data/parsed/`, `data/ingestion.sqlite`, and Qdrant storage together.
 
-The watcher must remain running; stop it with Ctrl+C to pause its schedule.
-Restart the server and watcher commands after a machine restart. This is a local
-single-worker polling pipeline, not an OS service or an instant file event hook.
+Use `docker compose stop watcher` to pause scanning and
+`docker compose up -d watcher` to resume. Containers restart automatically when
+Docker restarts unless explicitly stopped. Docker Desktop must be running.
+`docker compose down` stops these services without deleting bind-mounted data
+or the model volume; do not use `down -v` unless you intend to delete model caches.
+This is a local single-worker polling pipeline, not an instant file event hook.
 Defaults live in Settings; `BGR_SCAN_INTERVAL_SECONDS`, `BGR_FILE_SETTLE_SECONDS`,
-and `BGR_PREFECT_URL` override the interval, settle time, and local API URL.
-Use `--root /absolute/project/path` before the watcher command when elsewhere.
+and `BGR_PREFECT_URL` can be set in the watcher's Compose environment.
+For native development, the `board-game-rules-watch server` and `watch` commands
+are still available; do not run native and container watchers simultaneously.
 
 ## Simple web UI
 
@@ -133,8 +137,6 @@ uv run board-game-rules list
 uv run board-game-rules verify
 uv run board-game-rules doctor
 uv run board-game-rules parse DOCUMENT_ID
-uv run board-game-rules smoke DOCUMENT_ID \
-  "How is the first player selected?"
 ```
 
 Replace `DOCUMENT_ID` with an ID returned by `board-game-rules list`.
@@ -167,12 +169,9 @@ reference answers are short paraphrases with expected PDF pages, not copied
 rulebook text.
 
 `parse` caches the DoclingDocument, chunks, and diagnostics under `data/parsed/`.
-`smoke` embeds one selected document, queries a temporary Qdrant collection, and
-asks Gemma to answer using that evidence. It exits nonzero on invalid citations,
-incomplete model output, or an unsupported smoke-test answer. It is a
-single-document compatibility test, not yet expansion-aware production RAG.
-Inspect reported picture counts and page coverage: a successful conversion
-does not prove all diagrams or rules have been understood.
+The automated tests cover answer citations and the indexed RAG request path.
+Inspect parse reports for picture counts and page coverage: a successful
+conversion does not prove all diagrams or rules have been understood.
 
 Models download on first use. Parsing and generation stay local; model artifact
 downloads require internet access. Defaults live in
@@ -199,7 +198,8 @@ src/board_game_rules/
   config.py          # validated settings and defaults
   bootstrap.py       # wire concrete adapters
   domain/models.py   # contracts and edition/expansion validation
-  application/       # answering, evaluation, index publication, smoke-test workflow
+  application/       # answering and index publication
+  evaluation/        # fixed benchmark and prompt-comparison tooling
   infrastructure/    # document discovery, state, Prefect, and vendor adapters
   interfaces/        # CLI, watcher commands, and simple Streamlit screen
 ```
