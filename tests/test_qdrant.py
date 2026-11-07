@@ -18,8 +18,9 @@ def test_qdrant_round_trip_is_document_scoped(
     store = Vectors(settings)
     store.create("test", 2)
     other = chunk.model_copy(update={"document_id": "other-en", "index": 1})
-    store.put("test", [chunk, other], [[1.0, 0.0], [1.0, 0.0]])
-    hits = store.search("test", chunk.document_id, [1.0, 0.0], 10)
+    store.put_indexed("test", [chunk], [[1.0, 0.0]], "active")
+    store.put_indexed("test", [other], [[1.0, 0.0]], "active")
+    hits = store.search_indexed("test", chunk.document_id, "active", [1.0, 0.0], 10)
     assert len(hits) == 1
     assert hits[0].chunk == chunk
     assert hits[0].citation_id == 1
@@ -35,7 +36,7 @@ def test_qdrant_rejects_mismatched_batches(settings: Settings, chunk: Chunk, mon
     )
     store = Vectors(settings)
     with pytest.raises(ValueError, match="one embedding"):
-        store.put("test", [chunk], [])
+        store.put_indexed("test", [chunk], [], "active")
     store.close()
 
 

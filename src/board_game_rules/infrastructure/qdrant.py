@@ -24,45 +24,6 @@ class Vectors:
             vectors_config=models.VectorParams(size=dimension, distance=models.Distance.COSINE),
         )
 
-    def put(self, collection: str, chunks: list[Chunk], vectors: list[list[float]]) -> None:
-        if not chunks or len(chunks) != len(vectors):
-            raise ValueError("Expected one embedding per nonempty chunk batch.")
-        for start in range(0, len(chunks), 64):
-            points = [
-                models.PointStruct(
-                    id=str(uuid5(NAMESPACE_URL, f"{chunk.document_id}:{chunk.index}")),
-                    vector=vector,
-                    payload=chunk.model_dump(mode="json"),
-                )
-                for chunk, vector in zip(
-                    chunks[start : start + 64], vectors[start : start + 64], strict=True
-                )
-            ]
-            self.client.upsert(collection, points, wait=True)
-        if self.client.count(collection, exact=True).count != len(chunks):
-            raise ValueError("Qdrant stored chunk count does not match the inserted batch.")
-
-    def search(
-        self, collection: str, document_id: str, vector: list[float], limit: int
-    ) -> list[Evidence]:
-        hits = self.client.query_points(
-            collection,
-            query=vector,
-            query_filter=models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="document_id", match=models.MatchValue(value=document_id)
-                    )
-                ]
-            ),
-            limit=limit,
-            with_payload=True,
-        ).points
-        return [
-            Evidence(citation_id=i, chunk=Chunk.model_validate(hit.payload), score=hit.score)
-            for i, hit in enumerate(hits, 1)
-        ]
-
     def close(self) -> None:
         self.client.close()
 

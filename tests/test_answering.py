@@ -57,9 +57,9 @@ def test_qdrant_retrieval_produces_a_cited_answer(
     collection = "answering-test"
     store.create(collection, 2)
     try:
-        store.put(collection, [chunk], [[1.0, 0.0]])
-        evidence = store.search(
-            collection, rulebook.document_id, [1.0, 0.0], settings.retrieval_limit
+        store.put_indexed(collection, [chunk], [[1.0, 0.0]], "active")
+        evidence = store.search_indexed(
+            collection, rulebook.document_id, "active", [1.0, 0.0], settings.retrieval_limit
         )
         generator = Mock()
         generator.generate.return_value = Answer(

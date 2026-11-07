@@ -6,17 +6,6 @@ from board_game_rules.infrastructure.catalog import verify_pdf
 from board_game_rules.infrastructure.state import IndexState
 
 
-class Embedder(Protocol):
-    dimension: int
-
-    def passages(self, texts: list[str]) -> list[list[float]]: ...
-
-
-class DocumentParser(Protocol):
-    def fingerprint(self, doc: Rulebook) -> str: ...
-    def parse(self, doc: Rulebook) -> tuple[list[Chunk], ParseReport]: ...
-
-
 class IndexStore(Protocol):
     def ensure_index(self, collection: str, dimension: int) -> None: ...
     def indexed_count(self, collection: str, document_id: str, fingerprint: str) -> int: ...
@@ -62,18 +51,3 @@ def publish_vectors(
     state.publish(doc, report, settings.vector_collection)
 
 
-def ingest_document(
-    doc: Rulebook,
-    settings: Settings,
-    parser: DocumentParser,
-    embeddings: Embedder,
-    state: IndexState,
-    store: IndexStore,
-) -> str:
-    fingerprint = parser.fingerprint(doc)
-    if is_indexed(doc, fingerprint, settings, state, store):
-        return "unchanged"
-    chunks, report = parser.parse(doc)
-    vectors = embeddings.passages([chunk.contextualized_text for chunk in chunks])
-    publish_vectors(doc, chunks, vectors, report, settings, embeddings.dimension, state, store)
-    return "indexed"
