@@ -113,8 +113,9 @@ def run(args: argparse.Namespace, settings: Settings) -> None:
                 ollama,
                 settings,
             )
-            report = evaluate_with_ragas(report, settings)
             output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(report.model_dump_json(indent=2) + "\n")
+            report = evaluate_with_ragas(report, settings)
             output_path.write_text(report.model_dump_json(indent=2) + "\n")
             print(
                 json.dumps(

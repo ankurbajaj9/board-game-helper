@@ -233,8 +233,8 @@ def evaluate_with_ragas(report: EvaluationReport, settings: Settings) -> Evaluat
         from ragas import evaluate
         from ragas.dataset_schema import EvaluationResult
         from ragas.llms import llm_factory
+        from ragas.metrics import FactualCorrectness, Faithfulness
         from ragas.metrics.base import Metric
-        from ragas.metrics.collections import FactualCorrectness, Faithfulness
         from ragas.run_config import RunConfig
     except ImportError as exc:
         raise ValueError(
@@ -247,16 +247,18 @@ def evaluate_with_ragas(report: EvaluationReport, settings: Settings) -> Evaluat
         api_key="ollama",
         timeout=settings.timeout_seconds,
     )
+    judge_tokens = min(max(settings.answer_tokens, 4096), settings.context_tokens // 2)
     try:
         judge = llm_factory(
             model=settings.ollama_model,
             client=client,
             temperature=0,
-            max_tokens=settings.answer_tokens,
+            max_tokens=judge_tokens,
             extra_body={
                 "options": {
                     "num_ctx": settings.context_tokens,
-                    "num_predict": settings.answer_tokens,
+                    "num_predict": judge_tokens,
+                    "think": False,
                 }
             },
         )
@@ -274,7 +276,7 @@ def evaluate_with_ragas(report: EvaluationReport, settings: Settings) -> Evaluat
                     max_retries=2,
                     max_workers=1,
                 ),
-                raise_exceptions=True,
+                raise_exceptions=False,
                 show_progress=False,
             ),
         )
@@ -300,8 +302,12 @@ def _apply_ragas_scores(
                 PromptResult.model_validate(
                     {
                         **prompt_result.model_dump(),
-                        "ragas_faithfulness": prompt_scores["faithfulness"],
-                        "ragas_factual_correctness": prompt_scores[factual_score_key],
+                        "ragas_faithfulness": _valid_ragas_score(
+                            prompt_scores["faithfulness"]
+                        ),
+                        "ragas_factual_correctness": _valid_ragas_score(
+                            prompt_scores[factual_score_key]
+                        ),
                     }
                 )
             )
@@ -314,6 +320,13 @@ def _apply_ragas_scores(
     return report.model_copy(
         update={"cases": tuple(scored_cases), "ragas_judge_model": judge_model}
     )
+
+
+def _valid_ragas_score(value: object) -> float | None:
+    if isinstance(value, Exception) or not isinstance(value, int | float):
+        return None
+    score = float(value)
+    return score if 0 <= score <= 1 else None
 
 
 def summarize_ragas(report: EvaluationReport) -> dict[str, dict[str, float | int]]:
@@ -337,6 +350,8 @@ def summarize_ragas(report: EvaluationReport) -> dict[str, dict[str, float | int
             "factual_correctness": round(sum(factual_correctness) / len(factual_correctness), 4)
             if factual_correctness
             else 0.0,
+            "faithfulness_scored": len(faithfulness),
+            "factual_correctness_scored": len(factual_correctness),
             "scored": min(len(faithfulness), len(factual_correctness)),
             "unscored": len(report.cases) - min(len(faithfulness), len(factual_correctness)),
         }

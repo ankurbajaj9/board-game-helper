@@ -118,7 +118,10 @@ def test_evaluation_reuses_one_retrieval_for_both_prompt_strategies(
         return SimpleNamespace(
             scores=[
                 {"faithfulness": 0.75, "factual_correctness(mode=f1)": 0.85},
-                {"faithfulness": 0.95, "factual_correctness(mode=f1)": 0.65},
+                {
+                    "faithfulness": ValueError("Judge response was truncated"),
+                    "factual_correctness(mode=f1)": 0.65,
+                },
             ]
         )
 
@@ -127,9 +130,11 @@ def test_evaluation_reuses_one_retrieval_for_both_prompt_strategies(
     assert ragas_report.ragas_judge_model == settings.ollama_model
     assert ragas_report.cases[0].plain.ragas_faithfulness == 0.75
     assert ragas_report.cases[0].plain.ragas_factual_correctness == 0.85
-    assert ragas_report.cases[0].few_shot_citations.ragas_faithfulness == 0.95
+    assert ragas_report.cases[0].few_shot_citations.ragas_faithfulness is None
     assert ragas_report.cases[0].few_shot_citations.ragas_factual_correctness == 0.65
     assert summarize_ragas(ragas_report)["plain"]["faithfulness"] == 0.75
+    assert summarize_ragas(ragas_report)["few_shot_citations"]["scored"] == 0
+    assert summarize_ragas(ragas_report)["few_shot_citations"]["factual_correctness_scored"] == 1
 
 
 def test_retrieval_hit_requires_the_expected_pdf_page(
