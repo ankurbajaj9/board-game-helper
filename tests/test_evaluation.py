@@ -1,4 +1,6 @@
+import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 from board_game_rules.config import Settings
@@ -13,9 +15,13 @@ from board_game_rules.domain.models import (
 from board_game_rules.evaluation import (
     EvaluationCase,
     EvaluationReport,
+    _apply_ragas_scores,
+    evaluate_with_ragas,
     load_dataset,
+    ragas_samples,
     run_evaluation,
     summarize_faithfulness,
+    summarize_ragas,
 )
 
 
@@ -35,7 +41,7 @@ def test_fixed_dataset_has_twenty_unique_source_backed_cases() -> None:
 
 
 def test_evaluation_reuses_one_retrieval_for_both_prompt_strategies(
-    settings: Settings, rulebook: Rulebook, chunk: Chunk
+    settings: Settings, rulebook: Rulebook, chunk: Chunk, monkeypatch
 ) -> None:
     case = EvaluationCase(
         case_id="test_case",
@@ -99,7 +105,43 @@ def test_evaluation_reuses_one_retrieval_for_both_prompt_strategies(
     assert result.retrieval_hit_rate == 1.0
     assert result.cases[0].plain.manual_faithfulness is None
     assert result.cases[0].few_shot_citations.manual_faithfulness is None
+    assert len(ragas_samples(result)) == 2
+    assert ragas_samples(result)[0]["retrieved_contexts"] == [chunk.contextualized_text]
+    assert summarize_ragas(result)["plain"]["scored"] == 0
+    scored = _apply_ragas_scores(
+        result,
+        [
+            {"faithfulness": 0.7, "factual_correctness(mode=f1)": 0.8},
+            {"faithfulness": 0.9, "factual_correctness(mode=f1)": 0.6},
+        ],
+        "judge-model",
+    )
+    assert scored.ragas_judge_model == "judge-model"
+    assert scored.cases[0].plain.ragas_faithfulness == 0.7
+    assert scored.cases[0].few_shot_citations.ragas_factual_correctness == 0.6
+    assert summarize_ragas(scored)["plain"]["faithfulness"] == 0.7
     EvaluationReport.model_validate_json(result.model_dump_json())
+
+    if importlib.util.find_spec("ragas") is not None:
+        import ragas
+
+        def fake_evaluate(**kwargs):
+            assert len(kwargs["dataset"]) == 2
+            assert [metric.name for metric in kwargs["metrics"]] == [
+                "faithfulness",
+                "factual_correctness",
+            ]
+            return SimpleNamespace(
+                scores=[
+                    {"faithfulness": 0.75, "factual_correctness(mode=f1)": 0.85},
+                    {"faithfulness": 0.95, "factual_correctness(mode=f1)": 0.65},
+                ]
+            )
+
+        monkeypatch.setattr(ragas, "evaluate", fake_evaluate)
+        ragas_report = evaluate_with_ragas(result, settings)
+        assert ragas_report.ragas_judge_model == settings.ollama_model
+        assert ragas_report.cases[0].plain.ragas_faithfulness == 0.75
 
 
 def test_retrieval_hit_requires_the_expected_pdf_page(

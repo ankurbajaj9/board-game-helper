@@ -146,19 +146,26 @@ Replace `DOCUMENT_ID` with an ID returned by `board-game-rules list`.
 After the benchmark manuals have been indexed, run the 20-question evaluation:
 
 ```bash
+uv sync --extra evaluation
 uv run board-game-rules evaluate
 ```
 
 For each question, the runner retrieves evidence once and supplies those same
 passages to both the plain and few-shot citation prompts. The report records
-the expected document/page hit, retrieved passages, both answers, model and
-retrieval settings, and an initially empty `manual_faithfulness` field. The
-retrieval hit rate measures whether a returned passage contains the annotated
-document and page; it does not judge answer quality.
+passages to both the plain and few-shot citation prompts. Ragas scores both
+answers for faithfulness to the supplied passages and factual correctness
+against the reference answer, using the configured local Ollama model as the
+judge. The report also records the expected document/page hit, retrieved
+passages, both answers, model and retrieval settings, and an initially empty
+`manual_faithfulness` field. The retrieval hit rate measures whether a returned
+passage contains the annotated document and page; it remains a benchmark-specific
+metric.
 
 The report is written to `data/evaluation/results.json` (ignored by Git). Review
-each answer against its evidence, fill in `manual_faithfulness` as
-`supported`, `partly_supported`, or `unsupported`, then summarize the labels:
+The report is written to `data/evaluation/results.json` (ignored by Git). Review
+each answer against its evidence, optionally fill in `manual_faithfulness` as
+`supported`, `partly_supported`, or `unsupported`, then summarize Ragas scores
+and any manual labels:
 
 ```bash
 uv run board-game-rules score data/evaluation/results.json

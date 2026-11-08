@@ -1,8 +1,9 @@
 import hashlib
+import os
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 from pydantic import Field, model_validator
 
@@ -49,6 +50,8 @@ class EvaluationDataset(Model):
 class PromptResult(Model):
     answer: Answer
     manual_faithfulness: Faithfulness | None = None
+    ragas_faithfulness: float | None = Field(default=None, ge=0, le=1)
+    ragas_factual_correctness: float | None = Field(default=None, ge=0, le=1)
 
 
 class EvaluatedCase(Model):
@@ -67,6 +70,7 @@ class EvaluationReport(Model):
     collection: str
     embedding_model: str
     ollama_model: str
+    ragas_judge_model: str | None = None
     retrieval_limit: int = Field(ge=1)
     context_tokens: int = Field(gt=0)
     answer_tokens: int = Field(gt=0)
@@ -150,10 +154,10 @@ def run_evaluation(
             and set(entry.chunk.pdf_pages).intersection(case.evidence_pages)
             for entry in evidence
         )
-        plain, _ = answer_question(
+        plain, plain_evidence = answer_question(
             doc, case.question, evidence, generator, settings, prompt_strategy="plain"
         )
-        few_shot, _ = answer_question(
+        few_shot, few_shot_evidence = answer_question(
             doc,
             case.question,
             evidence,
@@ -161,13 +165,15 @@ def run_evaluation(
             settings,
             prompt_strategy="few_shot_citations",
         )
+        if plain_evidence != few_shot_evidence:
+            raise ValueError("Prompt strategies must use the same retrieved evidence.")
         results.append(
             EvaluatedCase(
                 case=case,
                 retrieval_hit=retrieval_hit,
                 document_sha256=doc.sha256,
                 index_fingerprint=report.fingerprint,
-                retrieved_evidence=tuple(evidence),
+                retrieved_evidence=tuple(plain_evidence),
                 plain=PromptResult(answer=plain),
                 few_shot_citations=PromptResult(answer=few_shot),
             )
@@ -201,4 +207,137 @@ def summarize_faithfulness(report: EvaluationReport) -> dict[str, dict[str, int]
         }
         scored = sum(counts.values())
         summary[strategy] = {**counts, "scored": scored, "unscored": len(report.cases) - scored}
+    return summary
+
+
+def ragas_samples(report: EvaluationReport) -> list[dict[str, object]]:
+    samples = []
+    for evaluated in report.cases:
+        contexts = [item.chunk.contextualized_text for item in evaluated.retrieved_evidence]
+        for result in (evaluated.plain, evaluated.few_shot_citations):
+            sample: dict[str, object] = {
+                "user_input": evaluated.case.question,
+                "response": result.answer.answer,
+                "retrieved_contexts": contexts,
+                "reference": evaluated.case.reference_answer,
+            }
+            samples.append(sample)
+    return samples
+
+
+def evaluate_with_ragas(report: EvaluationReport, settings: Settings) -> EvaluationReport:
+    os.environ.setdefault("RAGAS_DO_NOT_TRACK", "true")
+    try:
+        from openai import OpenAI
+        from ragas import EvaluationDataset as RagasDataset
+        from ragas import evaluate
+        from ragas.dataset_schema import EvaluationResult
+        from ragas.llms import llm_factory
+        from ragas.metrics.base import Metric
+        from ragas.metrics.collections import FactualCorrectness, Faithfulness
+        from ragas.run_config import RunConfig
+    except ImportError as exc:
+        raise ValueError(
+            "Ragas evaluation dependencies are missing. Install them with "
+            "`uv sync --extra evaluation`."
+        ) from exc
+
+    client = OpenAI(
+        base_url=f"{str(settings.ollama_url).rstrip('/')}/v1",
+        api_key="ollama",
+        timeout=settings.timeout_seconds,
+    )
+    try:
+        judge = llm_factory(
+            model=settings.ollama_model,
+            client=client,
+            temperature=0,
+            max_tokens=settings.answer_tokens,
+            extra_body={
+                "options": {
+                    "num_ctx": settings.context_tokens,
+                    "num_predict": settings.answer_tokens,
+                }
+            },
+        )
+        metrics = cast(
+            list[Metric],
+            [Faithfulness(llm=judge), FactualCorrectness(llm=judge, mode="f1")],
+        )
+        result = cast(
+            EvaluationResult,
+            evaluate(
+                dataset=RagasDataset.from_list(ragas_samples(report)),
+                metrics=metrics,
+                run_config=RunConfig(
+                    timeout=settings.timeout_seconds,
+                    max_retries=2,
+                    max_workers=1,
+                ),
+                raise_exceptions=True,
+                show_progress=False,
+            ),
+        )
+    finally:
+        client.close()
+    return _apply_ragas_scores(report, result.scores, settings.ollama_model)
+
+
+def _apply_ragas_scores(
+    report: EvaluationReport, scores: Sequence[dict[str, object]], judge_model: str
+) -> EvaluationReport:
+    scored_cases = []
+    factual_score_key = "factual_correctness(mode=f1)"
+    if len(scores) != len(report.cases) * 2:
+        raise ValueError("Ragas returned an unexpected number of prompt scores.")
+    for index, evaluated in enumerate(report.cases):
+        prompt_results = []
+        for prompt_index, prompt_result in enumerate(
+            (evaluated.plain, evaluated.few_shot_citations)
+        ):
+            prompt_scores = scores[index * 2 + prompt_index]
+            prompt_results.append(
+                PromptResult.model_validate(
+                    {
+                        **prompt_result.model_dump(),
+                        "ragas_faithfulness": prompt_scores["faithfulness"],
+                        "ragas_factual_correctness": prompt_scores[factual_score_key],
+                    }
+                )
+            )
+        scored_cases.append(
+            evaluated.model_copy(
+                update={"plain": prompt_results[0], "few_shot_citations": prompt_results[1]}
+            )
+        )
+
+    return report.model_copy(
+        update={"cases": tuple(scored_cases), "ragas_judge_model": judge_model}
+    )
+
+
+def summarize_ragas(report: EvaluationReport) -> dict[str, dict[str, float | int]]:
+    summary = {}
+    for strategy in ("plain", "few_shot_citations"):
+        results = [getattr(case, strategy) for case in report.cases]
+        faithfulness = [
+            result.ragas_faithfulness
+            for result in results
+            if result.ragas_faithfulness is not None
+        ]
+        factual_correctness = [
+            result.ragas_factual_correctness
+            for result in results
+            if result.ragas_factual_correctness is not None
+        ]
+        summary[strategy] = {
+            "faithfulness": round(sum(faithfulness) / len(faithfulness), 4)
+            if faithfulness
+            else 0.0,
+            "factual_correctness": round(sum(factual_correctness) / len(factual_correctness), 4)
+            if factual_correctness
+            else 0.0,
+            "scored": min(len(faithfulness), len(factual_correctness)),
+            "unscored": len(report.cases) - min(len(faithfulness), len(factual_correctness)),
+        }
     return summary

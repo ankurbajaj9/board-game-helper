@@ -20,6 +20,13 @@ board-game-rules = "board_game_rules.interfaces.cli:main"
 board-game-rules-ui = "board_game_rules.interfaces.ui:launch"
 board-game-rules-watch = "board_game_rules.interfaces.watcher:main"
 
+[project.optional-dependencies]
+evaluation = [
+    "langchain-community>=0.3.31,<0.4",
+    "langchain-openai>=1.1.9",
+    "ragas>=0.4.3,<0.5",
+]
+
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14"]
 build-backend = "uv_build"

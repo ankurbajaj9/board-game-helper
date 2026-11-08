@@ -13,9 +13,11 @@ from board_game_rules import bootstrap
 from board_game_rules.config import Settings
 from board_game_rules.evaluation import (
     EvaluationReport,
+    evaluate_with_ragas,
     load_dataset,
     run_evaluation,
     summarize_faithfulness,
+    summarize_ragas,
 )
 from board_game_rules.infrastructure.state import IndexState
 
@@ -38,7 +40,7 @@ def argument_parser() -> argparse.ArgumentParser:
     evaluate.add_argument(
         "--output", default="data/evaluation/results.json", help="Path for the evaluation report"
     )
-    score = commands.add_parser("score", help="Summarize manually reviewed answer faithfulness")
+    score = commands.add_parser("score", help="Summarize Ragas scores and manual reviews")
     score.add_argument("results", help="Evaluation report JSON, with manual labels filled in")
     return parser
 
@@ -49,7 +51,15 @@ def run(args: argparse.Namespace, settings: Settings) -> None:
         if not results_path.is_absolute():
             results_path = settings.project_root / results_path
         report = EvaluationReport.model_validate_json(results_path.read_bytes())
-        print(json.dumps(summarize_faithfulness(report), indent=2))
+        print(
+            json.dumps(
+                {
+                    "ragas": summarize_ragas(report),
+                    "manual_faithfulness": summarize_faithfulness(report),
+                },
+                indent=2,
+            )
+        )
         return
 
     catalog = bootstrap.catalog(settings)
@@ -103,6 +113,7 @@ def run(args: argparse.Namespace, settings: Settings) -> None:
                 ollama,
                 settings,
             )
+            report = evaluate_with_ragas(report, settings)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(report.model_dump_json(indent=2) + "\n")
             print(
@@ -112,6 +123,7 @@ def run(args: argparse.Namespace, settings: Settings) -> None:
                         "questions": len(report.cases),
                         "retrieval_hits": report.retrieval_hit_count,
                         "retrieval_hit_rate": report.retrieval_hit_rate,
+                        "ragas": summarize_ragas(report),
                     },
                     indent=2,
                 )
