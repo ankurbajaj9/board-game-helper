@@ -8,20 +8,12 @@ from board_game_rules.domain.models import Catalog, Rulebook
 from board_game_rules.infrastructure.catalog import load_catalog, rulebook_path, verify_pdf
 
 
-def test_real_catalog_rulesets() -> None:
+def test_real_catalog_loads_known_rulebooks() -> None:
     root = Path(__file__).resolve().parents[1]
     catalog = load_catalog(root / "catalog/rulebooks.json", root)
-    assert len(catalog.documents) == 10
     love_letter = catalog.document("love-letter-en")
     assert love_letter.title == "Love Letter"
     assert love_letter.pdf_pages == 16
-    assert catalog.ruleset("love-letter-en") == (love_letter,)
-    assert len(catalog.ruleset("catan-2025-en", ("catan-cities-knights-2025-en",))) == 2
-    assert len(catalog.ruleset("azul-summer-pavilion-en")) == 1
-    with pytest.raises(ValueError, match="not compatible"):
-        catalog.ruleset("azul-en", ("catan-cities-knights-2025-en",))
-    with pytest.raises(ValueError, match="explicit base"):
-        catalog.ruleset("terraforming-mars-prelude-en")
 
 
 def test_duplicate_catalog_document(rulebook: Rulebook) -> None:
@@ -37,7 +29,7 @@ def test_missing_expansion_base(rulebook: Rulebook) -> None:
         Catalog(schema_version=1, documents=(expansion,))
 
 
-def test_dependency_cycles_are_rejected(rulebook: Rulebook) -> None:
+def test_expansions_cannot_be_compatible_bases(rulebook: Rulebook) -> None:
     data = rulebook.model_dump(mode="json")
     data.update(kind="expansion", base_game_id="other", compatible_base_document_ids=["other-en"])
     first = Rulebook.model_validate(data)
@@ -83,12 +75,10 @@ def test_size_limit(settings: Settings, rulebook: Rulebook) -> None:
         verify_pdf(settings.project_root, rulebook, 5)
 
 
-def test_unknown_and_duplicate_selection(rulebook: Rulebook) -> None:
+def test_unknown_catalog_document_is_rejected(rulebook: Rulebook) -> None:
     catalog = Catalog(schema_version=1, documents=(rulebook,))
     with pytest.raises(ValueError, match="Unknown"):
         catalog.document("unknown")
-    with pytest.raises(ValueError, match="Duplicate expansion"):
-        catalog.ruleset(rulebook.document_id, ("same", "same"))
 
 
 @pytest.mark.parametrize(

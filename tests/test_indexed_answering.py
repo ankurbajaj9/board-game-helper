@@ -11,7 +11,7 @@ from board_game_rules.infrastructure.ollama import Ollama
 from board_game_rules.infrastructure.state import IndexState
 
 
-def test_ui_service_searches_active_vectors_without_rebuilding(
+def test_single_document_query_searches_active_vectors_without_rebuilding(
     settings: Settings, rulebook: Rulebook, chunk: Chunk, monkeypatch
 ) -> None:
     state = IndexState(settings.state_path)
@@ -23,8 +23,11 @@ def test_ui_service_searches_active_vectors_without_rebuilding(
         answer="Two cards.", supported=True, citations=(1,), missing_information=""
     )
     monkeypatch.setattr(bootstrap, "local_services", lambda settings: (vectors, ollama))
-    result, _, _ = bootstrap.ask(settings, services, rulebook.document_id, "How many cards?")
+    result, _, reports = bootstrap.ask_selected(
+        settings, services, (rulebook.document_id,), "How many cards?"
+    )
     assert result.supported
+    assert reports == (report(rulebook, "ready"),)
     vectors.search_indexed.assert_called_once_with(
         settings.vector_collection,
         rulebook.document_id,
@@ -39,13 +42,13 @@ def test_ui_service_searches_active_vectors_without_rebuilding(
 
 def test_unindexed_rulebook_is_an_explicit_error(settings: Settings) -> None:
     with pytest.raises(ValueError, match="not indexed"):
-        bootstrap.ask(settings, Mock(), "unknown", "Question?")
+        bootstrap.ask_selected(settings, Mock(), ("unknown",), "Question?")
 
 
 def test_changed_embedding_model_requires_reindex(settings: Settings, rulebook: Rulebook) -> None:
     IndexState(settings.state_path).publish(rulebook, report(rulebook, "old"), "other-model")
     with pytest.raises(ValueError, match="re-indexing"):
-        bootstrap.ask(settings, Mock(), rulebook.document_id, "Question?")
+        bootstrap.ask_selected(settings, Mock(), (rulebook.document_id,), "Question?")
 
 
 def test_trace_records_all_hits_but_only_budgeted_evidence_sent_to_gemma(
@@ -78,8 +81,8 @@ def test_trace_records_all_hits_but_only_budgeted_evidence_sent_to_gemma(
     services = Mock()
     services.embeddings.query.return_value = [1.0, 0.0]
     observer = Mock()
-    _, used, _ = bootstrap.ask(
-        settings, services, rulebook.document_id, "How many cards?", observer
+    _, used, _ = bootstrap.ask_selected(
+        settings, services, (rulebook.document_id,), "How many cards?", observer
     )
     events = {call.args[0]: call.args[1] for call in observer.call_args_list}
     assert events["Embedding question"]["question"] == "How many cards?"

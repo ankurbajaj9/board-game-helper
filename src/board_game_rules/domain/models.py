@@ -64,24 +64,6 @@ class Catalog(Model):
                 return doc
         raise ValueError(f"Unknown document ID: {document_id}")
 
-    def ruleset(self, base_id: str, expansion_ids: tuple[str, ...] = ()) -> tuple[Rulebook, ...]:
-        base = self.document(base_id)
-        if base.kind == "expansion":
-            raise ValueError("Select an explicit base edition, then add expansions.")
-        if len(set(expansion_ids)) != len(expansion_ids):
-            raise ValueError("Duplicate expansion selection.")
-        expansions = tuple(self.document(doc_id) for doc_id in expansion_ids)
-        for expansion in expansions:
-            if (
-                expansion.kind != "expansion"
-                or base_id not in expansion.compatible_base_document_ids
-            ):
-                raise ValueError(
-                    f"{expansion.title} is not compatible with {base.title}, {base.edition}."
-                )
-        return (base, *expansions)
-
-
 class Chunk(Model):
     document_id: str
     index: int = Field(ge=0)

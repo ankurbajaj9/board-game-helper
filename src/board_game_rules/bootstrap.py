@@ -75,17 +75,6 @@ def local_services(
     return Vectors(settings, observer), Ollama(settings, observer)
 
 
-def ask(
-    settings: Settings,
-    services: Parsing,
-    document_id: str,
-    question: str,
-    observer: QueryObserver | None = None,
-) -> tuple[Answer, list[Evidence], ParseReport]:
-    answer, evidence, reports = ask_selected(settings, services, (document_id,), question, observer)
-    return answer, evidence, reports[0]
-
-
 def ask_selected(
     settings: Settings,
     services: Parsing,

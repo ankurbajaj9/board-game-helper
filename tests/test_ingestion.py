@@ -61,7 +61,6 @@ def ingest(settings: Settings, rulebook: Rulebook, store: Vectors, monkeypatch):
 def test_ingestion_is_persistent_and_unchanged_is_a_noop(
     settings: Settings, rulebook: Rulebook, chunk: Chunk, store: Vectors, ingest
 ) -> None:
-    state = IndexState(settings.state_path)
     parser = Mock()
     parser.fingerprint.return_value = "first"
     parser.parse.return_value = ([chunk], report(rulebook, "first"))
@@ -147,7 +146,6 @@ def test_missing_qdrant_data_is_rebuilt(
     parser.fingerprint.return_value = "same"
     parser.parse.return_value = ([chunk], report(rulebook, "same"))
     embeddings.passages.return_value = [[1.0, 0.0]]
-    state = IndexState(settings.state_path)
     ingest(parser, embeddings)
     store.delete(settings.vector_collection)
     assert ingest(parser, embeddings) == "indexed"
