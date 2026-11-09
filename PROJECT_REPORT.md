@@ -225,12 +225,29 @@ faithfulness labels yet. The `supported` and citation counts above are model
 outputs, not independent judgments of correctness, and do not show that either
 prompt is more accurate.
 
-Ragas scoring did not complete. The local Gemma judge returned a truncated
-structured faithfulness response at the configured output limit, so no Ragas
-faithfulness or factual-correctness scores are included in the saved report. The
-Ragas integration needs a judge configuration that reliably returns its
-structured verdicts before those scores can be reported. The optional
-prompt-injection experiment also remains unrun.
+Ragas scoring completed with partial faithfulness coverage. The evaluator was
+`gemma4:e2b`, the same model used to generate answers. Scores range from 0 to 1;
+the means below exclude failed judgments rather than treating them as zero.
+
+| Ragas metric | Plain mean | Plain scored | Few-shot mean | Few-shot scored |
+| --- | ---: | ---: | ---: | ---: |
+| Faithfulness | 0.9211 | 19/20 | 1.0000 | 18/20 |
+| Factual correctness (F1) | 0.5460 | 20/20 | 0.4440 | 20/20 |
+
+Three faithfulness judgments failed because structured judge output was
+truncated: both strategies for `catan_city_points`, and few-shot for
+`pandemic_outbreak_effect`. These entries remain unscored in the saved report.
+The faithfulness means therefore cover different subsets and are not a fully
+paired comparison.
+
+Few-shot prompting scored higher on faithfulness among successful judgments,
+while plain prompting scored higher on reference-based factual correctness by
+0.1020. Faithfulness measures grounding in supplied evidence, not completeness
+against the reference; these observations do not establish an overall winner.
+The small benchmark, missing judgments, and use of the same model as generator
+and judge limit generalization and introduce possible self-evaluation bias.
+Human faithfulness review remains necessary for the original course evaluation.
+The optional prompt-injection experiment also remains unrun.
 
 Page overlap and valid citations are useful checks, not guarantees of correctness.
 Text extraction may lose meaning from icon-heavy tables, diagrams, or layout.
@@ -241,7 +258,8 @@ configuration is not hardened for remote or multi-user access.
 
 The project demonstrates the core RAG pipeline and provides a controlled
 plain-versus-few-shot comparison over a fixed question set. The first run reports
-a 90% page-level retrieval hit rate and model-generated support/citation counts.
-Manual answer review and a reliable Ragas judge run are still needed before drawing
-conclusions about comparative answer quality. The controlled prompt-injection
-experiment also remains future work.
+a 90% page-level retrieval hit rate. Ragas produced complete factual-correctness
+scores and partial faithfulness scores: plain prompting performed better on
+reference-based correctness, while few-shot performed better on the successfully
+scored faithfulness subset. Manual review, completion of missing judgments, and
+the controlled prompt-injection experiment remain future work.
